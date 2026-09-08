@@ -1,0 +1,14 @@
+node_modules/
+unpackage/
+.hbuilderx/
+.DS_Store
+.codex-tasks/
+
+.idea/
+
+.vscode/
+.prettierignore
+.prettierrc
+
+wrangler.toml
+.wrangler/

@@ -1,0 +1,50 @@
+# wrangler.toml 示例 — Telegram 客服 Bot（Cloudflare Workers）
+# 文档：https://developers.cloudflare.com/workers/wrangler/configuration/
+# 用法：复制为 wrangler.toml，替换所有 <占位符> 后执行 `wrangler deploy`
+
+# Worker 名称（同名部署会互相覆盖，也是 workers.dev 子域名的一部分）
+name = "<WORKER_NAME>"
+
+# 入口文件（含 MediaGroupAggregator Durable Object 类）
+main = "woker.js"
+
+# 兼容性日期：决定运行时行为开关，建议设为部署当天
+# https://developers.cloudflare.com/workers/configuration/compatibility-dates/
+compatibility_date = "2026-09-01"
+
+# ---------- KV 命名空间（必需） ----------
+# 存储用户 ↔ 话题双向映射、答题验证状态
+# id 位置：控制台 Storage & Databases → KV → 你的命名空间 → 详情
+# 新建：`wrangler kv namespace create TOPIC_MAP`
+[[kv_namespaces]]
+binding = "TOPIC_MAP"
+id = "<KV_NAMESPACE_ID>"
+
+# ---------- Durable Objects（必需，相册聚合用） ----------
+# 同一 media_group_id 固定路由到同一实例，天然串行 + alarm 定时 flush
+# 注意：控制台在线编辑器无法配置 DO，必须用 wrangler 部署
+[durable_objects]
+bindings = [
+  { name = "MEDIA_GROUPS", class_name = "MediaGroupAggregator" }
+]
+
+# 声明导出的 DO 类（SQLite 存储，免费计划可用）
+[exports.MediaGroupAggregator]
+type = "durable-object"
+storage = "sqlite"
+
+# ---------- 普通变量（非敏感） ----------
+[vars]
+# 客服论坛群（supergroup）的 chat id，带 -100 前缀
+SUPERGROUP_ID = "<SUPERGROUP_ID>"
+# bot 自己的 user id（@userinfobot 可查），用于过滤 bot 自身消息
+BOT_ID = "<BOT_ID>"
+# 答题验证开关："1" 开启，其他值关闭
+VERIFY_FLAG = "1"
+
+# ---------- 密钥（敏感值，不要写进本文件） ----------
+# 用命令配置，存储在服务端：
+#   wrangler secret put BOT_TOKEN       # bot token（@BotFather 可查）
+#   wrangler secret put WEBHOOK_SECRET  # openssl rand -hex 32 生成，setWebhook 时携带
+# 可选：
+#   wrangler secret put API_BASE        # 自定义 Telegram API 地址（默认 https://api.telegram.org）

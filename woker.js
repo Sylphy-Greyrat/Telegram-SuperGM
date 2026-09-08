@@ -73,7 +73,6 @@ async function handlePrivateMessage(msg, env) {
   const userId = msg.chat.id;
 
   // user: 记录存在即已验证（记录仅在验证通过后创建），稳态热路径只 1 次 KV 读
-  // 兼容旧拼写 VERFITY_FLAG，待线上变量全部切换后可移除
   let rec = await env.TOPIC_MAP.get(`user:${userId}`, { type: "json" });
   if (!rec && env.VERIFY_FLAG === '1') {
     // Telegram 内答题验证。答题消息只用于验证，不会转发到客服群。
@@ -93,6 +92,19 @@ async function handlePrivateMessage(msg, env) {
     rec = await createAndStoreTopic(msg.from, userId, env);
     // user: 落地即代表已验证，删除答对时写入的 verified: 桥接键
     await env.TOPIC_MAP.delete(`verified:${userId}`);
+  } else {
+    // 改名同步：昵称/@username 变化时更新话题标题；失败不阻断转发
+    const latestTitle = buildTopicTitle(msg.from);
+    if (latestTitle !== rec.title) {
+      rec.title = latestTitle;
+      const editRes = await tgCall(env, "editForumTopic", {
+        chat_id: env.SUPERGROUP_ID,
+        message_thread_id: rec.thread_id,
+        name: latestTitle,
+      });
+      if (!editRes.ok) console.log("editForumTopic failed", { threadId: rec.thread_id, description: editRes.description });
+      await env.TOPIC_MAP.put(`user:${userId}`, JSON.stringify(rec));
+    }
   }
 
   // 相册聚合：用户 -> 话题

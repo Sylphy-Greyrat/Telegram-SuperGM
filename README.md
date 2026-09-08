@@ -14,6 +14,7 @@
 
 - 🛡️ **数字验证**：新用户先在 Telegram 私聊中回答一道简单算术题，降低机器人骚扰和滥用风险。
 - 💬 **独立话题沟通**：每个用户都在独立的 Telegram 话题（Forum）中对话，历史清晰、管理不串线。
+- 🔄 **话题自动改名**：用户修改昵称或 `@username` 后，话题标题会在其下一条私聊消息时自动同步更新，管理员无需手动辨认。
 - ⚫️ **随时拉黑用户**：若不想再接收某个用户的消息，直接在群内关闭对应话题，即可拦截 TA 的所有后续消息。（市面上的bot几乎都没有一键屏蔽用户消息的功能）
 - 🖼️ **多媒体支持**：支持图片、视频、文件等消息类型的转发；文本消息支持 Telegram Markdown 格式。
 - ⚡ **无需自建服务器**：基于 Cloudflare Worker，按量计费，省心托管，轻松应对大量消息。（实际上随便咋用都不会超过免费额度~）
@@ -142,6 +143,8 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tgbot.xxxx.com&
 4. 在话题菜单中关闭话题后，再次发消息应只收到“话题已关闭”的提示，不再推送到群；重新开启话题后又会恢复转发。
 5. 一次发送多张图片（相册）：
    - bot 应将整组相册聚合为一条媒体消息推送（wrangler 部署方式下生效，最多 10 张，2 秒超时自动发送）。
+6. 修改自己的 Telegram 昵称或 `@username` 后，再给 bot 发一条消息：
+   - 超级群中该用户的话题标题应自动更新为新名字。
 
 ---
 
@@ -187,7 +190,7 @@ console.log(JSON.stringify(update, null, 2));
    - 请改用 wrangler 部署（见部署指南方式 B），确认部署输出中包含 `MEDIA_GROUPS` 绑定。
 
 5. 修改代码后如何验证？  
-   - 跑冒烟测试：`node test/woker.test.mjs`（9 个场景，覆盖 KV 读写次数与完整答题流程），通过后再 `wrangler deploy`。
+   - 跑冒烟测试：`node test/woker.test.mjs`（9 个场景，覆盖 KV 读写次数、完整答题流程与改名同步），通过后再 `wrangler deploy`。
 
 ---
 
@@ -197,7 +200,7 @@ console.log(JSON.stringify(update, null, 2));
 
 - **2026-08-26**：验证改为 Telegram 内直接回答随机算术题，不再依赖网页或 Cloudflare Turnstile；题目记录保存 15 分钟，答对后才允许转发消息。
 
-- **2026-09-08**：KV 读写优化——稳态私聊每条消息从 2 次 KV 读降为 1 次；非客服话题增加哨兵缓存，避免每条闲聊消息触发全量扫描（免费额度炸点）；补齐旧数据的 `thread:` 反向索引；`VERFITY_FLAG` 更正为 `VERIFY_FLAG`（兼容旧拼写）；相册聚合改用 Durable Objects 实现，新增 webhook secret 校验与 429 自动重试；新增 wrangler 部署配置与冒烟测试。
+- **2026-09-08**：KV 读写优化——稳态私聊每条消息从 2 次 KV 读降为 1 次；非客服话题增加哨兵缓存，避免每条闲聊消息触发全量扫描（免费额度炸点）；补齐旧数据的 `thread:` 反向索引；`VERFITY_FLAG` 更正为 `VERIFY_FLAG`（兼容旧拼写）；相册聚合改用 Durable Objects 实现，新增 webhook secret 校验与 429 自动重试；新增 wrangler 部署配置与冒烟测试。同日新增话题标题自动跟随用户改名（昵称/`@username` 变化时同步，改名失败不阻断转发）。
 
 
 ---

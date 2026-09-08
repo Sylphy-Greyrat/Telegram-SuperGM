@@ -154,9 +154,23 @@ async function main() {
   await kv.put("user:42", JSON.stringify({ thread_id: 777, title: "A", closed: false }));
   tgCalls.length = 0;
   kv[READS] = 0; kv[WRITES] = 0;
-  await post({ message: { chat: { id: 42, type: "private" }, from: { id: 42 }, message_id: 5, text: "again" } });
+  await post({ message: { chat: { id: 42, type: "private" }, from: { id: 42, first_name: "A" }, message_id: 5, text: "again" } });
   assert.equal(kv[READS], 1, "稳态热路径只 1 读（原来 2 读）");
-  assert.equal(kv[WRITES], 0, "稳态不写 KV");
+  assert.equal(kv[WRITES], 0, "稳态不写 KV（名字未变不触发改名同步）");
+  assert.ok(!tgCalls.some((c) => c.method === "editForumTopic"), "名字未变不调 editForumTopic");
+
+  // ---------- 场景 5b：用户改名 -> 同步话题标题 + 更新 KV ----------
+  kv = mockKV();
+  await kv.put("user:42", JSON.stringify({ thread_id: 777, title: "旧名字", closed: false }));
+  tgCalls.length = 0;
+  await post({ message: { chat: { id: 42, type: "private" }, from: { id: 42, first_name: "新名字", username: "newuser" }, message_id: 6, text: "hi" } });
+  const editCall = tgCalls.find((c) => c.method === "editForumTopic");
+  assert.ok(editCall, "改名后调用 editForumTopic");
+  assert.equal(editCall.name, "新名字 @newuser", "新标题为 昵称 @username");
+  assert.equal(editCall.message_thread_id, 777, "改的是该用户的话题");
+  const renamedRec = JSON.parse(await kv.get("user:42"));
+  assert.equal(renamedRec.title, "新名字 @newuser", "KV title 同步更新");
+  assert.ok(tgCalls.some((c) => c.method === "forwardMessage"), "改名同步不阻断消息转发");
 
   // ---------- 场景 6：话题回复 -> thread: 命中 1 读 ----------
   kv = mockKV();
